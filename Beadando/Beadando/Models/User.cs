@@ -13,15 +13,15 @@ namespace Beadando.Models
     {
 
         [Name("username")]
-        public string? Username { get; set; } = string.Empty;
+        public string Username { get; set; } = string.Empty;
         [Name("password")]
-        public string? PasswordHash { get; set; } = string.Empty;  // *hash* függvény
+        public string PasswordHash { get; set; } = string.Empty;  // *hash* függvény
         [Name("email")]
-        public string? Email { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
         [Name("firstname")]
-        public string? FirstName { get; set; } = string.Empty;
+        public string FirstName { get; set; } = string.Empty;
         [Name("lastname")]
-        public string? LastName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
 
         public static string GenerateMainPasswdHash(string password)
         {

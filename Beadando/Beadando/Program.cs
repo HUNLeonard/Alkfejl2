@@ -19,16 +19,17 @@ namespace Beadando
         static string cusername = "";
         static string cpassword = "";
         static string cemail = "";
+        static string cfirstname = "";
+        static string clastname = "";
         static string cwebuser = "";
         static string cwebpassword = "";
         static string cwebsite = "";
 
-
-
-
         static bool register = false;
         static bool list = false;
         static bool vault = false;
+        static bool deleteuser = false;
+        static bool deletevault = false;
 
         static void Main(string[] args)
         {
@@ -64,13 +65,15 @@ namespace Beadando
                 if (UserExists(userCsvFilePath, cusername, cpassword)){
                     foreach (var sor in GetVaultEntriesForUser(cusername, vaultCsvFilePath)) 
                     {
+#pragma warning disable CS8602 // Dereference of a possibly null reference.
                         EncryptedType e = new EncryptedType(sor.LogUser.Email, sor.PasswordEncrypted);
+#pragma warning restore CS8602 // Dereference of a possibly null reference.
                         Console.WriteLine($"Username: {sor.Username} | Password: {e.Decrypt().Secret} | Website: {sor.Website}");
                     }
                 }
                 else
                 {
-                    Console.WriteLine("A jelszó vagy a felhasználónév HELYTELEN!");
+                    Console.WriteLine("\nHiba!\nA jelszó vagy a felhasználónév Autentikációnal HELYTELEN!");
                 }
 
             }
@@ -82,9 +85,33 @@ namespace Beadando
                 }
                 else
                 {
-                    Console.WriteLine("A jelszó vagy a felhasználónév HELYTELEN!");
+                    Console.WriteLine("\nHiba!\nA jelszó vagy a felhasználónév Authentikációnal HELYTELEN!");
                 }
 
+            }
+            else if (deleteuser)
+            {
+                if (UserExists(userCsvFilePath, cusername, cpassword))
+                {
+                    DeleteUser(userCsvFilePath, cusername);
+                    DeleteUserVaultEntries(vaultCsvFilePath, cusername);
+                    Console.WriteLine("\nA felhasználó és a hozzá tartozó jelszavak törlése sikeres volt.");
+                }
+                else
+                {
+                    Console.WriteLine("\nHiba!\nA jelszó vagy a felhasználónév Authentikációnal HELYTELEN VAGY felhasználó nem létezik!");
+                }
+            }
+            else if (deletevault)
+            {
+                if (UserExists(userCsvFilePath, cusername, cpassword))
+                {
+                    DeleteUserVaultEntry(vaultCsvFilePath, cusername, cwebuser, cwebsite);
+                }
+                else
+                {
+                    Console.WriteLine("\nHiba!\nA jelszó vagy a felhasználónév autentikációval helytelen!");
+                }
             }
         }
 
@@ -111,19 +138,23 @@ namespace Beadando
 
 
                 // Check if username already exists in the CSV file along with website
-                if (vaultCsvFileExists && cwebsite.Length != 0)
+                if (vaultCsvFileExists)
                 {
-                    using (var reader = new StreamReader(vaultCsvFilePath))
-                    using (var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture)))
+                    if(cwebsite.Length != 0)
                     {
-                        var records = csv.GetRecords<VaultEntry>().ToList();
-                        if (records.Any(u => u.Username == cwebuser) && records.Any(u => u.Website == cwebsite))
+                        using (var reader = new StreamReader(vaultCsvFilePath))
+                        using (var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture)))
                         {
-                            Console.WriteLine("Adott webre már van valaki regisztrált ezzel a felhasználó névvel.");
-                            return;
+                            var records = csv.GetRecords<VaultEntry>().ToList();
+                            if (records.Any(u => u.Username == cwebuser) && records.Any(u => u.Website == cwebsite)) // && records.Any(u => u.Id == cusername)
+                            {
+                                Console.WriteLine($"\nAdott webre '{cwebsite}' már van valaki regisztrált ezzel a felhasználó névvel.");
+                                return;
+                            }
                         }
                     }
                 }
+
 
                 using (var writer = new StreamWriter(vaultCsvFilePath, true))
                 using (var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)))
@@ -143,7 +174,9 @@ namespace Beadando
                     VaultEntry vault = new VaultEntry();
                     vault.Id = cusername;
                     vault.Username = cwebuser;
+#pragma warning disable CS8602 // Dereference of a possibly null reference.
                     EncryptedType e = new EncryptedType(vault.LogUser.Email, cwebpassword);
+#pragma warning restore CS8602 // Dereference of a possibly null reference.
                     vault.PasswordEncrypted = e.Encrypt().Secret;
                     vault.Website = cwebsite;
 
@@ -151,7 +184,7 @@ namespace Beadando
                     csv.WriteRecord(vault);
                     csv.NextRecord();
 
-                    Console.WriteLine("A regisztráció a vault-ba sikeres volt.");   
+                    Console.WriteLine("\nA regisztráció a vault-ba sikeres volt.");   
                     Console.WriteLine($"WebUsername: {vault.Username}\nWebsite: {vault.Website}\n");
 
                 }
@@ -160,7 +193,7 @@ namespace Beadando
             }
             catch (Exception ex)
             {
-                Console.WriteLine("An error occurred: " + ex.Message);
+                Console.WriteLine("\nAn error occurred: " + ex.Message);
             }
         }
 
@@ -181,7 +214,7 @@ namespace Beadando
                         var records = csv.GetRecords<User>().ToList();
                         if (records.Any(u => u.Username == cusername))
                         {
-                            Console.WriteLine("A felhasználónév már foglalt :).");
+                            Console.WriteLine("\nHiba!\nA felhasználónév már foglalt :).");
                             return;
                         }
                     }
@@ -206,21 +239,94 @@ namespace Beadando
                     user.Username = cusername;
                     user.PasswordHash = User.GenerateMainPasswdHash(cpassword);
                     user.Email = cemail;
+                    user.FirstName = cfirstname;
+                    user.LastName= clastname;
 
 
                     csv.WriteRecord(user);
                     csv.NextRecord();
-                    Console.WriteLine("A regisztráció sikeres volt.");
+                    Console.WriteLine("\nA regisztráció sikeres volt.");
+                    Console.WriteLine($"\nUsername: {user.Username}\nEmail: {user.Email}\nFirstName: {user.FirstName}\nLastName: {user.LastName}");
                 }
 
 
             }
             catch (Exception ex)
             {
-                Console.WriteLine("An error occurred: " + ex.Message);
+                Console.WriteLine("\nAn error occurred: " + ex.Message);
             }
         }
 
+        public static void DeleteUser(string UserCsvPath, string username)
+        {
+            if (UserCsvPath == null) return;
+
+            var records = new List<User>();
+            using (var reader = new StreamReader(UserCsvPath))
+            using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
+            {
+                records = csv.GetRecords<User>().ToList();
+            }
+
+            records.RemoveAll(user => user.Username == username);
+
+            using (var writer = new StreamWriter(UserCsvPath))
+            using (var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)))
+            {
+                csv.WriteRecords(records);
+            }
+        }
+
+        public static void DeleteUserVaultEntries(string VaultCsvPath, string username)
+        {
+            if (VaultCsvPath == null) return;
+
+            var records = new List<VaultEntry>();
+            using (var reader = new StreamReader(VaultCsvPath))
+            using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
+            {
+                records = csv.GetRecords<VaultEntry>().ToList();
+            }
+
+            records.RemoveAll(entry => entry.Id == username);
+
+            using (var writer = new StreamWriter(VaultCsvPath))
+            using (var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)))
+            {
+                csv.WriteRecords(records);
+            }
+        }
+
+        public static void DeleteUserVaultEntry(string VaultCsvPath, string userId, string webUsername, string website)
+        {
+            if (VaultCsvPath == null) return;
+
+            var records = new List<VaultEntry>();
+            using (var reader = new StreamReader(VaultCsvPath))
+            using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
+            {
+                records = csv.GetRecords<VaultEntry>().ToList();
+            }
+
+            // Töröljük az első olyan bejegyzést, amelynek azonosítója (Id) és webusername és website megegyezik a megadott értékekkel
+            var entryToDelete = records.FirstOrDefault(entry => entry.Id == userId && entry.Username == webUsername && entry.Website == website);
+
+            if (entryToDelete != null)
+            {
+                records.Remove(entryToDelete);
+
+                using (var writer = new StreamWriter(VaultCsvPath))
+                using (var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)))
+                {
+                    csv.WriteRecords(records);
+                }
+                Console.WriteLine("\nA webuser törlése az adott website-ról sikeres volt.");
+            }
+            else
+            {
+                Console.WriteLine($"\nNincs olyan bejegyzés, amely az adott webusername ({webUsername}) és website ({website}) kombinációt tartalmazza.");
+            }
+        }
 
         public static List<VaultEntry> GetVaultEntriesForUser(string username, string VaultCsvPath)
         {
@@ -233,7 +339,7 @@ namespace Beadando
 
                 if (!users.Any(user => user.Id == username))
                 {
-                    Console.WriteLine("A felhasználónak, nincsenek jelszavai a Vaultban elmentve.");
+                    Console.WriteLine("\nA felhasználónak nincsenek jelszavai a Vaultban elmentve.");
                     return new List<VaultEntry>();
                 }
             }
@@ -249,131 +355,227 @@ namespace Beadando
             }
         }
 
-
         static void ArgsManager(string[] args)
         {
 
             if (args.Length == 0)
             {
-                Console.WriteLine("Használható szintaxis: \n'dotnet run 'COMMANDS' !\n" +
+                Console.WriteLine("Használandó szintaxis: \ndotnet run 'kötelező' 'Kommandok' 'Opc. kommandok'\n\n" +
                     "Kötelező:\n" +
-                    "--workdir=<arg>    |   Ezzel tudod megadni hogy hol kezelje a felhasználói adatokat.\n\n" +
+                    "--workdir=<arg>\n||Ezzel tudod megadni hogy hol kezelje a felhasználói adatokat.\n\n\n" +
                     "Kommandok:\n" +
-                    "--register --username=<arg> --password=<arg>   |   Regisztáció.\n" +
-                    "--list --username=<arg> --password=<arg>       |   Kilistázza a VaultEntry-ből a regisztált accountokat.\n\n" +
-                    "--vault --username=<arg> --password=<arg> --webuser=<arg> --webpassword=<arg> --website=<arg>    " +
-                    "                                               | Vault-ba regisztrálás (1. autentikáció | 2. adatok) \n\n" +
-                    "Opcionális:\n" +
-                    "--email=<arg>      |   A register kommand végére még emailt is meglehet adni!");
+                    "--register --username=<arg> --password=<arg> (+opciós kommand)\n||Regisztrál egy felhasználót.\n" +
+
+                    "--list --username=<arg> --password=<arg>\n||Kilistázza a felhasználónak a különböző jelszavait weboldalakon.\n" +
+
+                    "--vault --username=<arg> --password=<arg> --webuser=<arg> --webpassword=<arg> (+opciós kommand)\n" +
+                    "||Weboldalakra való regisztrációs adatok elmentése.\n" +
+
+                    "--deleteuser --username=<arg> --password=<arg>\n" +
+                    "||User illetve Weboldalakra való regisztrációs adatok törlése.\n" +
+
+                    "--deletevault --username=<arg> --password=<arg> --webuser=<arg> --website=<arg>\n" +
+                    "||Weboldalra való regisztrált webuser törlése.\n\n\n" +
+
+                    "Opcionális kommandok:\n" +
+                    "Register:\n" +
+                    "--email=<arg>\n|| Megadható felhasználó regisztációnál email is.\n" +
+                    "--firstname=<arg>\n|| Megadható felhasználó regisztációnál firstname is.\n" +
+                    "--lastname=<arg>\n|| Megadható felhasználó regisztációnál lastname is.\n\n" +
+                    "Vault:\n" +
+                    "--website=<arg>\n|| Megadható melyik webstite-ra szólnak a regisztációs adatok.\n\n");
+
                 return;
             }
 
             if (!args[0].StartsWith("--workdir=") || args[0].Split("=")[1].Length == 0)
             {
-                Console.WriteLine("Nem adtál meg '--workdir=<arg>'-t !");
+                Console.WriteLine("\nHiba!\nNem adtál meg '--workdir=<arg>'-t !");
                 return;
             }
 
             workdir = args[0].Split("=")[1];
 
-            if (args.Length < 2 || (!args[1].Contains("--list") && !args[1].Contains("--register") && !args[1].Contains("--vault")))
+            if (args.Length <= 1 || (!args[1].ToLower().Equals("--list") && !args[1].ToLower().Equals("--register") && !args[1].ToLower().Equals("--vault") && !args[1].ToLower().Equals("--deleteuser") && !args[1].ToLower().Equals("--deletevault")))
             {
-                Console.WriteLine("Hiba! Nem '--list' vagy '--register' vagy '--vault' -t írtál be!");
+                Console.WriteLine("\nHiba!\nNem '--list'/'--register'/'--vault'/'--deleteuser'/'--deletevault' -t írtál be '--workdir=<arg>' után!");
                 return;
             }
 
-            bool isRegister = args[1].Contains("--register");
-            bool isList = args[1].Contains("--list");
-            bool isVault = args[1].Contains("--vault");
+            bool isRegister = args[1].ToLower().Contains("--register");
+            bool isList = args[1].ToLower().Contains("--list");
+            bool isVault = args[1].ToLower().Contains("--vault");
+            bool isDeleteUser = args[1].ToLower().Contains("--deleteuser");
+            bool isDeleteVault = args[1].ToLower().Contains("--deletevault");
 
-            if (!isRegister && !isList && !isVault)
+
+            if (args.Length <= 2|| !args[2].StartsWith("--username=") || args[2].Split("=")[1].Length == 0)
             {
-                Console.WriteLine("Hiba! Nem '--list' vagy '--register' vagy '--vault' -t írtál be!");
+                Console.WriteLine("\nHiba!\nNem/Rosszul adtad meg '--username=<arg>'-t !\n");
+                Console.WriteLine(GetRightCommand(isRegister,isList,isVault, isDeleteUser));
+                return;
+            }
+            if (args.Length <= 3 || !args[3].StartsWith("--password=") || args[3].Split("=")[1].Length == 0)
+            {
+                Console.WriteLine("\nHiba!\nNem/Rosszul adtad meg '--password=<arg>'-t !");
+                Console.WriteLine(GetRightCommand(isRegister, isList, isVault, isDeleteUser));
                 return;
             }
 
-            if ((isList || isRegister || isVault) && args.Length < 4)
-            {
-                Console.WriteLine("Nem adtál meg '--username=<arg> --password=<arg>'!");
-                return;
-            }
 
-
-            if (args[2].StartsWith("--username=") && args[2].Split("=")[1].Length > 0)
+            if (isRegister)
             {
-                if (args[3].StartsWith("--password=") && args[3].Split("=")[1].Length > 0)
+                if (args.Length >= 5)
                 {
-                    if (isRegister)
+                    if (!args[4].StartsWith("--email=") || args[4].Split("=")[1].Length == 0)
                     {
-                        cusername = args[2].Split("=")[1];
-                        cpassword = args[3].Split("=")[1];
-                        register = true;
-                        if (args.Length > 4)
-                        {
-                            if (args[4].StartsWith("--email=") && args[4].Split("=")[1].Length > 0)
-                            {
-                                cemail = args[4].Split("=")[1];
-                                return;
-                            }
-                        }
-                    }
-                    else if (isList)
-                    {
-                        cusername = args[2].Split("=")[1];
-                        cpassword = args[3].Split("=")[1];
-                        list = true;
+                        Console.WriteLine("\nHiba!\nRosszul adtad meg '--email=<arg>' -t !");
                         return;
                     }
-                    else if (isVault)
+                    cemail = args[4].Split("=")[1];
+                }
+                if (args.Length >= 6)
+                {
+                    if (!args[5].StartsWith("--firstname=") || args[5].Split("=")[1].Length == 0)
                     {
-                        if (args.Length <= 4)
-                        {
-                            Console.WriteLine("Nem adtál meg '--webuser=<arg> --webpassword=<arg> (opcionális: '--website=<arg>')' -t !");
-                            return;
-                        }
-                        if (args.Length < 5 || !args[4].StartsWith("--webuser=") || args[4].Split("=")[1].Length == 0)
-                        {
-                            Console.WriteLine(args.Length >= 5);
-                            Console.WriteLine($"Nem adtál meg '--webuser=<arg>' -t !");
-                            return;
-                        }
-                        if (args.Length < 6 || !args[5].StartsWith("--webpassword=") || args[5].Split("=")[1].Length == 0)
-                        {
-                            Console.WriteLine("Nem adtál meg '--webpassword=<arg>' -t !");
-                            return;
-                        }
-                        if (args.Length >= 7)
-                        {
-                            if (!args[6].StartsWith("--website=") || args[6].Split("=")[1].Length == 0)
-                            {
-                                Console.WriteLine("Rosszul adtad meg '--website=<arg>' -t !");
-                                return;
-                            }
-                            else { cwebsite = args[6].Split("=")[1]; }
-                        }
-
-
-                        cusername = args[2].Split("=")[1];
-                        cpassword = args[3].Split("=")[1];
-                        cwebuser = args[4].Split("=")[1];
-                        cwebpassword = args[5].Split("=")[1];
-
-                        vault = true;
+                        Console.WriteLine("\nHiba!\nRosszul adtad meg '--firstname=<arg>' -t !");
+                        return;
                     }
+                    cfirstname = args[5].Split("=")[1];
+                }
+                if (args.Length >= 7)
+                {
+                    if (!args[6].StartsWith("--lastname=") || args[6].Split("=")[1].Length == 0)
+                    {
+                        Console.WriteLine("\nHiba!\nRosszul adtad meg '--lastname=<arg>' -t !");
+                        return;
+                    }
+                    clastname = args[6].Split("=")[1];
+                }
 
+                cusername = args[2].Split("=")[1];
+                cpassword = args[3].Split("=")[1];
+                register = true;
+                return;
+            }
+            else if (isList)
+            {
+                cusername = args[2].Split("=")[1];
+                cpassword = args[3].Split("=")[1];
+                list = true;
+                return;
+            }
+            else if (isDeleteUser)
+            {
+                cusername = args[2].Split("=")[1];
+                cpassword = args[3].Split("=")[1];
+                deleteuser = true;
+                return;
+            }
+            else if (isDeleteVault)
+            {
+                
+                if (args.Length <= 4)
+                {
+                    Console.WriteLine("\nHiba!\nNem adtál meg '--webuser=<arg> --website=<arg>' -t !");
+                    return;
+                }
+                if (args.Length < 5 || !args[4].StartsWith("--webuser=") || args[4].Split("=")[1].Length == 0)
+                {
+                    Console.WriteLine($"\nHiba!\nNem/Rosszul adtad meg '--webuser=<arg>' -t !");
+                    return;
+                }
+                if (args.Length < 6 || !args[5].StartsWith("--website="))
+                {
+                    Console.WriteLine("\nHiba!\nNem/Rosszul adtad meg '--website=<arg>' -t !");
+                    return;
+                }
+                if (args[5].Split("=")[1].Length == 0)
+                {
+                    cwebsite = "";
                 }
                 else
                 {
-                    Console.WriteLine("Nem adtál meg '--password=<arg>'-t !");
+                    cwebsite = args[5].Split("=")[1];
+                }
+
+                cusername = args[2].Split("=")[1];
+                cpassword = args[3].Split("=")[1];
+                cwebuser = args[4].Split("=")[1];
+
+                deletevault = true;
+                return;
+            }
+            else if (isVault)
+            {
+                if (args.Length <= 4)
+                {
+                    Console.WriteLine("\nHiba!\nNem adtál meg '--webuser=<arg> --webpassword=<arg> (opcionális: '--website=<arg>')' -t !");
                     return;
                 }
-            }
-            else
-            {
-                Console.WriteLine("Nem adtál meg '--username=<arg>'-t !");
+                if (args.Length < 5 || !args[4].StartsWith("--webuser=") || args[4].Split("=")[1].Length == 0)
+                {
+                    Console.WriteLine(args.Length >= 5);
+                    Console.WriteLine($"\nHiba!\nNem adtál meg '--webuser=<arg>' -t !");
+                    return;
+                }
+                if (args.Length < 6 || !args[5].StartsWith("--webpassword=") || args[5].Split("=")[1].Length == 0)
+                {
+                    Console.WriteLine("\nHiba!\nNem adtál meg '--webpassword=<arg> (opcionális: '--website=<arg>')' -t !");
+                    return;
+                }
+                if (args.Length >= 7)
+                {
+                    if (!args[6].StartsWith("--website="))
+                    {
+                        Console.WriteLine("\nHiba!\nRosszul adtad meg '--website=<arg>' -t !");
+                        return;
+                    }
+                    if(args[6].Split("=")[1].Length == 0) 
+                    {
+                        cwebsite = "";
+                    }
+                    else
+                    {
+                        cwebsite = args[6].Split("=")[1];
+                    }
+                }
+
+
+                cusername = args[2].Split("=")[1];
+                cpassword = args[3].Split("=")[1];
+                cwebuser = args[4].Split("=")[1];
+                cwebpassword = args[5].Split("=")[1];
+                Console.WriteLine(cwebsite);
+                vault = true;
                 return;
             }
 
+        }
+
+        static string GetRightCommand(bool isRegister , bool isList, bool isVault, bool isDelete)
+        {
+            if (isRegister)
+            {
+                return ("Helyes szintaxis '--register' után: \n\n" +
+                " --username=<arg> --password=<arg> (opcionális: '--email=<arg> --firstname=<arg> --lastname<arg>')");
+            }
+            else if (isList)
+            {
+                return ("Helyes szintaxis '--list' után: \n\n" +
+                " --username=<arg> --password=<arg>");
+            }
+            else if (isVault)
+            {
+                return ("Helyes szintaxis '--vault' után: \n\n" +
+                " --username=<arg> --password=<arg> --webuser=<arg> --webpassword=<arg> (opcionális: '--website=<arg>')");
+            }
+            else if (isDelete)
+            {
+                return ("Helyes szintaxis '--deleteuser' után: \n\n" +
+                " --username=<arg> --password=<arg>");
+            }
+            return "";
         }
 
 
